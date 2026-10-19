@@ -15,14 +15,15 @@ This lesson covers:
 9. [Running terminal commands and scripts](#9-running-terminal-commands-and-scripts)
 10. [Letting Claude keep working: `/goal` and `/loop`](#10-letting-claude-keep-working-goal-and-loop)
 11. [Reviewing pull requests](#11-reviewing-pull-requests)
-12. [How Claude Code consumes tokens](#12-how-claude-code-consumes-tokens)
-13. [`/clear`, `/compact` and other context commands](#13-clear-compact-and-other-context-commands)
-14. [Subagents](#14-subagents)
-15. [Checklist: an efficient session](#15-checklist-an-efficient-session)
-16. [Bonus: cutting cost in your own Claude API apps](#16-bonus-cutting-cost-in-your-own-claude-api-apps)
-17. [Cheat sheet](#17-cheat-sheet)
+12. [Artifacts: pages you can share](#12-artifacts-pages-you-can-share)
+13. [How Claude Code consumes tokens](#13-how-claude-code-consumes-tokens)
+14. [`/clear`, `/compact` and other context commands](#14-clear-compact-and-other-context-commands)
+15. [Subagents](#15-subagents)
+16. [Checklist: an efficient session](#16-checklist-an-efficient-session)
+17. [Bonus: cutting cost in your own Claude API apps](#17-bonus-cutting-cost-in-your-own-claude-api-apps)
+18. [Cheat sheet](#18-cheat-sheet)
 
-The `examples` folder has things you can try: a skill ([section 6](#6-skills)), a plugin ([section 7](#7-plugins-and-the-plugin-manager)), and a safety hook plus a Python script that calls Claude ([section 9](#9-running-terminal-commands-and-scripts)).
+The `examples` folder has things you can try: a skill ([section 6](#6-skills)), a plugin ([section 7](#7-plugins-and-the-plugin-manager)), a safety hook plus a Python script that calls Claude ([section 9](#9-running-terminal-commands-and-scripts)), and the source of a published artifact ([section 12](#12-artifacts-pages-you-can-share)).
 
 ---
 
@@ -289,7 +290,7 @@ You can pull other files in with `@`:
 See @README.md for setup and @docs/style.md for code style.
 ```
 
-**Keep CLAUDE.md short (under about 200 lines).** It is sent with *every* request, so every line costs tokens on every turn (see [section 12](#12-how-claude-code-consumes-tokens)). Put long, task-specific instructions into a [skill](#6-skills) instead. Skills load only when needed.
+**Keep CLAUDE.md short (under about 200 lines).** It is sent with *every* request, so every line costs tokens on every turn (see [section 13](#13-how-claude-code-consumes-tokens)). Put long, task-specific instructions into a [skill](#6-skills) instead. Skills load only when needed.
 
 ---
 
@@ -472,7 +473,7 @@ claude plugin uninstall commit-commands@claude-plugins-official
 
 Plugin skills are namespaced by the plugin name: `/plugin-name:skill-name`.
 
-**Install only what you use.** Every enabled plugin adds its skill descriptions, tools and MCP servers to the startup context, and that costs tokens on every request (see [section 12](#12-how-claude-code-consumes-tokens)).
+**Install only what you use.** Every enabled plugin adds its skill descriptions, tools and MCP servers to the startup context, and that costs tokens on every request (see [section 13](#13-how-claude-code-consumes-tokens)).
 
 ### How a plugin is built
 
@@ -937,7 +938,7 @@ It also works in scripts:
 claude -p "/goal CHANGELOG.md has an entry for every PR merged this week"
 ```
 
-**Cost.** Each check runs on a small, fast model and costs very little. The real cost is the extra turns: every turn resends the whole conversation (see [section 12](#12-how-claude-code-consumes-tokens)). A turn limit in the condition is your budget.
+**Cost.** Each check runs on a small, fast model and costs very little. The real cost is the extra turns: every turn resends the whole conversation (see [section 13](#13-how-claude-code-consumes-tokens)). A turn limit in the condition is your budget.
 
 ### `/loop`: repeat on a schedule
 
@@ -1094,7 +1095,82 @@ It installs the `code-review` plugin and runs it on each PR. Keep the `claude_ar
 
 ---
 
-## 12. How Claude Code consumes tokens
+## 12. Artifacts: pages you can share
+
+Some answers work better as a web page than as terminal text: a report for your team, a dashboard, a diagram, a walkthrough of a PR. Claude Code can publish one as an **artifact**: a live, interactive page on claude.ai that you can open in the browser and share.
+
+### Who can use them
+
+- You need a **Pro, Max, Team or Enterprise** plan, and you must be signed in with your claude.ai account (`/login`).
+- Artifacts do **not** work when Claude Code uses an API key, a gateway token (so **not with Ollama**, section 2) or a cloud provider such as Amazon Bedrock.
+- They are off in `claude -p` runs, the Agent SDK and the GitHub Action.
+- On Team and Enterprise plans they are on by default, and an organization owner can turn them off.
+
+### Making one
+
+Just ask:
+
+```
+> make an artifact that walks through this PR with the diff annotated inline
+> make an artifact that explains how the LangGraph checkpoint examples fit together, with a diagram
+> turn the output of `pytest` into an artifact my team can read: failures first, grouped by file
+```
+
+Claude writes a single HTML page, publishes it and prints the link, and your browser opens it. Claude may also suggest an artifact on its own when a page would be clearer than text.
+
+**Demo:** this lesson's course overview, [**AI LLM Course**](https://claude.ai/artifact/Fog7q7Bv3cL4HaQ3MMLPFd), was made this way. Claude was asked to "add a part about artifacts and, as a demo, produce an artifact about the course". It read the lesson folders, counted the scripts, checked which lessons need API keys, and published the page. Its source is in [`examples/artifact/course-map.html`](examples/artifact/course-map.html).
+
+### Private until you share it
+
+A new artifact is **private**: only you can open the link. To share it, open the page on claude.ai and use the **Share** control in its header:
+
+| Plan | Who you can share with |
+|---|---|
+| Pro, Max | Keep it private, or let anyone with the link view it |
+| Team, Enterprise | Specific people in your organization, or the whole organization. A public link works only if an owner has turned on external sharing. |
+
+People outside your organization who open a public link see a note that the content is user-generated and unverified. Viewers can't change the page. On Team and Enterprise you can also add **editors**, who can publish new versions.
+
+### Updating, versions and finding it again
+
+- **Update it** by asking: "add a per-lesson difficulty level and republish". Claude edits the file and republishes to the **same URL**. Every publish is a new version, and in Share you choose which version viewers see.
+- **From another session**, give Claude the artifact's URL. Otherwise it makes a new artifact.
+- **`/artifacts`** lists your artifacts and the ones shared with you. Select one and press `o` to open it in the browser, `c` to copy its link, or `Enter` to attach it to the session.
+- **`Ctrl+]`** reopens the most recent artifact.
+- All of them are in the gallery at **claude.ai/code/artifacts**.
+
+### Comments
+
+People in your organization can comment on a shared artifact. To act on them:
+
+```
+> read the comments on https://claude.ai/code/artifact/... and make the changes the commenters ask for
+```
+
+Editors can also send a comment thread straight to Claude with **Send to Claude** or by writing `@claude`. While your session is open, Claude watches the artifacts it published and can reply on its own.
+
+### More than a static page
+
+- **Live data:** a page can call your claude.ai connectors (section 8) when it loads, for example a sprint dashboard that reads Jira every time someone opens it. Each viewer uses their own connector login.
+- **Downloads:** a page can offer a file to download, such as a CSV.
+- **Templates (beta):** `/slides <brief>` makes a slide deck and `/design <brief>` a visual design. Claude Docs makes documents that people edit together.
+
+### Limits
+
+- One self-contained page, with no backend of its own and no login for viewers. Long content uses in-page links.
+- At most 16 MiB. Large embedded images are the usual reason a publish fails.
+- Scripts load only from a few CDNs (cdnjs, jsDelivr, unpkg, Tailwind, jQuery) and fonts only from Google Fonts. Claude puts everything else inside the page.
+- Pages load from `*.claudeusercontent.com`. A company network must allow that domain as well as claude.ai.
+
+### Artifacts and tokens
+
+A styled page is much longer than a terminal answer, and Claude writes every character of it as **output tokens**, the expensive kind (section 13). Embedded images make it much bigger still. Ask for an artifact when people will actually use the page, such as a report for others, a dashboard, or an explanation that needs a picture, and ask for diagrams as SVG rather than images.
+
+To turn artifacts off, use `/config`, set `"enableArtifact": false` in your settings, or start Claude with `CLAUDE_CODE_DISABLE_ARTIFACT=1`. Set `CLAUDE_CODE_ARTIFACT_AUTO_OPEN=0` if you don't want the browser to open after each publish.
+
+---
+
+## 13. How Claude Code consumes tokens
 
 This is the most important section for using Claude Code efficiently.
 
@@ -1244,7 +1320,7 @@ Mention each file only once per conversation. Mentioning it again attaches anoth
 
 #### 2. How many turns it stays
 
-Each new turn rereads all earlier turns, so **several short sessions are cheaper than one long one.** That is what `/clear` and `/compact` are for ([section 13](#13-clear-compact-and-other-context-commands)).
+Each new turn rereads all earlier turns, so **several short sessions are cheaper than one long one.** That is what `/clear` and `/compact` are for ([section 14](#14-clear-compact-and-other-context-commands)).
 
 `/loop` runs a prompt on a timer ([section 10](#10-letting-claude-keep-working-goal-and-loop)). Each run is a full turn that carries the whole conversation, and misses the cache if more than an hour passed. Start loops in a fresh session in a separate terminal.
 
@@ -1254,7 +1330,7 @@ Every session you run in parallel has its own context and its own cost. Run seve
 
 ---
 
-## 13. `/clear`, `/compact` and other context commands
+## 14. `/clear`, `/compact` and other context commands
 
 ### `/clear`: start fresh
 
@@ -1311,7 +1387,7 @@ Goes back to an earlier point in the conversation (and can undo file changes too
 
 ---
 
-## 14. Subagents
+## 15. Subagents
 
 A **subagent** is a helper Claude starts for a sub-task. It has its own context window, system prompt, tools and CLAUDE.md, but **not your conversation**. It works through its own turns, and **only its final answer comes back** to your session. Everything else it read is thrown away.
 
@@ -1329,7 +1405,7 @@ By default a subagent uses your main model. For a noisy job you repeat often, cr
 
 ---
 
-## 15. Checklist: an efficient session
+## 16. Checklist: an efficient session
 
 1. **Start right.** Check `/model` and `/effort` at the start. Turn on fast mode now if you want it.
 2. **Check the startup load once.** Run `/context` in a fresh session. Trim CLAUDE.md, MCP servers and plugins you do not use.
@@ -1345,7 +1421,7 @@ By default a subagent uses your main model. For a noisy job you repeat often, cr
 
 ---
 
-## 16. Bonus: cutting cost in your own Claude API apps
+## 17. Bonus: cutting cost in your own Claude API apps
 
 The same ideas apply when **you** build apps on the Claude API (as in the earlier lessons). Anthropic's article on this names three levers.
 
@@ -1393,7 +1469,7 @@ In Anthropic's benchmarks, `cost-optimize` cut cost by roughly 24% to 73% with l
 
 ---
 
-## 17. Cheat sheet
+## 18. Cheat sheet
 
 ### Shell
 
@@ -1431,6 +1507,8 @@ In Anthropic's benchmarks, `cost-optimize` cut cost by roughly 24% to 73% with l
 | `/code-review [effort] [--fix] [--comment] [pr#]` | Review your changes or a PR for bugs |
 | `/security-review` | Security review of your branch |
 | `/simplify` | Clean up changed code (not a bug hunt) |
+| `/artifacts` | Your artifacts: `o` open, `c` copy link |
+| `/slides <brief>`, `/design <brief>` | Slide deck or design as an artifact |
 | `/agents` | Manage subagents |
 | `/model`, `/effort` | Set model and effort (do it at the start) |
 | `/context` | What fills the context window |
@@ -1450,6 +1528,7 @@ In Anthropic's benchmarks, `cost-optimize` cut cost by roughly 24% to 73% with l
 | `!cmd` | Run a shell command |
 | `Shift+Tab` | Cycle permission modes (including plan mode) |
 | `Ctrl+B` | Move a running command to the background |
+| `Ctrl+]` | Reopen the latest artifact |
 | `Esc` / `Esc Esc` | Stop Claude / rewind menu |
 | `Ctrl+R` | Search your prompt history |
 

@@ -155,6 +155,7 @@ The `13. claude-code` folder has a guide to using [Claude Code](https://code.cla
 - Running terminal commands: permissions, background tasks, hooks, and calling Claude from scripts with `claude -p`
 - Letting Claude keep working on its own with `/goal` and `/loop`
 - Reviewing pull requests with `/code-review`, `/security-review` and GitHub
+- Artifacts: publishing shareable pages, with a demo page about this course
 - How Claude Code consumes tokens, and when to use `/clear`, `/compact` and `/rewind`
 
-The `examples` folder has a sample skill (`explain-code`), a sample plugin marketplace (`course-tools`), a hook that blocks dangerous commands, and a Python script that calls Claude Code. Claude Code needs a paid Claude plan or a Claude Console account, or a local model through Ollama.
+The `examples` folder has a sample skill (`explain-code`), a sample plugin marketplace (`course-tools`), a hook that blocks dangerous commands, a Python script that calls Claude Code, and the source of the course overview artifact. Claude Code needs a paid Claude plan or a Claude Console account, or a local model through Ollama.
