@@ -1,0 +1,6 @@
+{
+  "name": "course-tools",
+  "description": "Helpers for the AI LLM course",
+  "version": "1.0.0",
+  "author": { "name": "Higgs Labs" }
+}
