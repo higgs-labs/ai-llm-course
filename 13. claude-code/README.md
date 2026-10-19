@@ -12,12 +12,13 @@ This lesson covers:
 6. [Plugins and the plugin manager](#6-plugins-and-the-plugin-manager)
 7. [Connectors (MCP): Jira, GitHub and more](#7-connectors-mcp-jira-github-and-more)
 8. [Running terminal commands and scripts](#8-running-terminal-commands-and-scripts)
-9. [How Claude Code consumes tokens](#9-how-claude-code-consumes-tokens)
-10. [`/clear`, `/compact` and other context commands](#10-clear-compact-and-other-context-commands)
-11. [Subagents](#11-subagents)
-12. [Checklist: an efficient session](#12-checklist-an-efficient-session)
-13. [Bonus: cutting cost in your own Claude API apps](#13-bonus-cutting-cost-in-your-own-claude-api-apps)
-14. [Cheat sheet](#14-cheat-sheet)
+9. [Letting Claude keep working: `/goal` and `/loop`](#9-letting-claude-keep-working-goal-and-loop)
+10. [How Claude Code consumes tokens](#10-how-claude-code-consumes-tokens)
+11. [`/clear`, `/compact` and other context commands](#11-clear-compact-and-other-context-commands)
+12. [Subagents](#12-subagents)
+13. [Checklist: an efficient session](#13-checklist-an-efficient-session)
+14. [Bonus: cutting cost in your own Claude API apps](#14-bonus-cutting-cost-in-your-own-claude-api-apps)
+15. [Cheat sheet](#15-cheat-sheet)
 
 The `examples` folder has things you can try: a skill ([section 5](#5-skills)), a plugin ([section 6](#6-plugins-and-the-plugin-manager)), and a safety hook plus a Python script that calls Claude ([section 8](#8-running-terminal-commands-and-scripts)).
 
@@ -159,7 +160,7 @@ You can pull other files in with `@`:
 See @README.md for setup and @docs/style.md for code style.
 ```
 
-**Keep CLAUDE.md short (under about 200 lines).** It is sent with *every* request, so every line costs tokens on every turn (see [section 9](#9-how-claude-code-consumes-tokens)). Put long, task-specific instructions into a [skill](#5-skills) instead. Skills load only when needed.
+**Keep CLAUDE.md short (under about 200 lines).** It is sent with *every* request, so every line costs tokens on every turn (see [section 10](#10-how-claude-code-consumes-tokens)). Put long, task-specific instructions into a [skill](#5-skills) instead. Skills load only when needed.
 
 ---
 
@@ -342,7 +343,7 @@ claude plugin uninstall commit-commands@claude-plugins-official
 
 Plugin skills are namespaced by the plugin name: `/plugin-name:skill-name`.
 
-**Install only what you use.** Every enabled plugin adds its skill descriptions, tools and MCP servers to the startup context, and that costs tokens on every request (see [section 9](#9-how-claude-code-consumes-tokens)).
+**Install only what you use.** Every enabled plugin adds its skill descriptions, tools and MCP servers to the startup context, and that costs tokens on every request (see [section 10](#10-how-claude-code-consumes-tokens)).
 
 ### How a plugin is built
 
@@ -756,7 +757,99 @@ It installs the Claude GitHub App, stores your key as a repo secret, and opens a
 
 ---
 
-## 9. How Claude Code consumes tokens
+## 9. Letting Claude keep working: `/goal` and `/loop`
+
+Normally Claude finishes a turn and waits for you. Two commands let it keep going without you typing:
+
+| | `/goal` | `/loop` |
+|---|---|---|
+| You say | "Keep working until this is true" | "Do this again every N minutes" |
+| It stops when | The condition is met, judged impossible, or you clear it | You stop it, the session closes, or after 7 days |
+| Good for | Finishing a task: make the tests pass, fix every lint error | Watching something: CI, a deploy, a queue |
+
+### `/goal`: work until a condition is met
+
+```
+> /goal python "11. MultiAgent/3_tool_error_handling.py" runs without errors, and no other file is changed
+```
+
+Claude starts working right away. After each turn, a separate small, fast model reads the conversation and decides whether the condition is met:
+
+- **Not met:** Claude starts another turn on its own. The checker's reason tells it what is still missing.
+- **Met:** the goal is cleared and Claude stops.
+- **Impossible:** the goal is cleared and marked as failed.
+
+Commands:
+
+```
+> /goal              # status: the condition, turns so far, token spend, the checker's last reason
+> /goal clear        # stop and remove the goal (stop, off and cancel also work)
+```
+
+`/clear` removes the goal too. If you `--resume` the session, an active goal comes back.
+
+**Writing a good condition.** The checker **only reads the conversation**. It does not run commands or open files. So the condition must be something Claude can *show*:
+
+| Weak | Better |
+|---|---|
+| "the code works" | "`pytest -q` exits 0, shown by running it" |
+| "fix the tests" | "all tests in `tests/auth` pass and no test file is edited" |
+| "make it faster" | "`python bench.py` prints under 200 ms, or stop after 15 turns" |
+
+- Make it **measurable**, and say **how it is checked**.
+- Add **constraints** ("don't change other files").
+- Add a **turn limit**, such as "or stop after 15 turns", so a stuck task doesn't run forever.
+
+**Permissions.** `/goal` only removes the need to say "continue". Claude still asks before tool calls your settings don't allow. To let a goal run unattended, start it in auto mode (`Shift+Tab`) or allow the commands it needs with [permission rules](#permission-rules-stop-answering-the-same-prompt).
+
+It also works in scripts:
+
+```bash
+claude -p "/goal CHANGELOG.md has an entry for every PR merged this week"
+```
+
+**Cost.** Each check runs on a small, fast model and costs very little. The real cost is the extra turns: every turn resends the whole conversation (see [section 10](#10-how-claude-code-consumes-tokens)). A turn limit in the condition is your budget.
+
+### `/loop`: repeat on a schedule
+
+```
+> /loop 5m check whether the GitHub Actions run for my last push has finished, and tell me if it failed
+```
+
+| Form | Example | What happens |
+|---|---|---|
+| Fixed interval | `/loop 10m run pytest -q and report new failures` | Runs every 10 minutes |
+| Run a skill or command | `/loop 30m /explain-code app.py` | Runs the skill each time |
+| No interval (self-paced) | `/loop check the deploy status` | Claude picks the wait (1 minute to 1 hour) after each run and tells you why |
+| Nothing at all | `/loop` | Runs the prompt in `.claude/loop.md` (or a built-in maintenance prompt) |
+
+- Units: `s`, `m`, `h`, `d`. The smallest step is one minute, and odd intervals are rounded to a nearby one. Claude tells you what it picked.
+- A loop can run only skills Claude is allowed to start on its own. Built-in commands such as `/clear` or `/model`, and skills with `disable-model-invocation: true`, arrive as plain text instead.
+
+**Stopping and listing loops.** Press `Esc` to cancel the next run of a self-paced loop. For any loop, just ask:
+
+```
+> what scheduled tasks do I have?
+> cancel the deploy check
+```
+
+**How long a loop lives:**
+
+- **Only while the session is open** and Claude is idle. Closing the terminal stops it. Missed runs are not caught up.
+- Repeating loops end automatically **7 days** after you create them.
+- `--resume` brings back fixed-interval loops but not self-paced ones. Start those again.
+- To run something when your computer is off, use **`/schedule`** instead. It creates a *routine* that runs in Anthropic's cloud on a fresh copy of your repo, at most once an hour.
+- To turn off loops completely, start Claude with `CLAUDE_CODE_DISABLE_CRON=1`.
+
+**Cost.** Every run is a full turn that carries **the whole conversation** so far. A loop started at the end of a long session resends that long session every 5 minutes. So:
+
+- Start loops in a **fresh session**, in a separate terminal.
+- Keep the loop prompt short, and ask for short reports ("reply 'no change' if nothing changed").
+- Pick an interval that matches how fast the thing really changes. A CI run that takes 10 minutes needs one check after 10 minutes, not ten checks one minute apart.
+
+---
+
+## 10. How Claude Code consumes tokens
 
 This is the most important section for using Claude Code efficiently.
 
@@ -777,16 +870,46 @@ You are billed per token, but what you really pay for is GPU time. Three things 
 - **Input (prefill):** what the model reads: the system prompt, tool definitions, CLAUDE.md, your messages, file contents, command output.
 - **Output (decode):** what the model writes: its *thinking*, tool calls and answer. **Output costs about 5x as much as input per token.**
 
-Much of the output is *thinking*. The **effort level** controls how much Claude thinks per turn:
+Much of the output is *thinking*. The **effort level** controls how much Claude thinks per turn (see [Choosing model and effort](#choosing-model-and-effort) below).
+
+**3. Whether it was cached.** See [Prompt caching](#prompt-caching).
+
+### Choosing model and effort
+
+These two settings decide most of what a turn costs. **Effort** sets how hard Claude works: how much it thinks, how many checks it runs, how far it explores before answering.
 
 ```
-> /effort low       # quick, routine tasks
-> /effort high      # hard problems
+> /effort            # show the current level and the options
+> /effort medium     # set it
 ```
 
-For routine work you can turn thinking off for one session: `MAX_THINKING_TOKENS=0 claude`.
+| Level | Use it for |
+|---|---|
+| `low` | Routine, well-defined work: rename a variable, fix a typo, write a docstring, run a known command |
+| `medium` | Everyday coding: a small feature, a clear bug fix |
+| `high` | Unclear bugs, changes across many files, design decisions |
+| `xhigh`, `max` | The hardest problems, where a wrong answer is expensive. Not every model offers every level. |
+| `auto` | Go back to the default |
 
-**3. Whether it was cached.** See the next part.
+Miscalibration costs you either way:
+
+- **Too high:** Claude overthinks. You pay more and wait longer, and the answer is sometimes *worse*. Extra thinking only helps while there is something left to find.
+- **Too low:** Claude stops early, skips checks and answers from partial information. You then pay for the follow-up turns that fix it.
+
+What Anthropic measured (from the sources below):
+
+- On a set of very hard coding tasks, max effort scored about **2.7x** higher than low effort but cost about **3.5x** more per task. On hard problems, more effort really does pay.
+- On a knowledge test, going from low to max raised the score from about 53% to 61%. **The last step up to max added only half a point for 46% more cost.**
+- A newer, stronger model at **low** effort matched the older model at **high** effort for about **one third** of the cost.
+
+How to choose:
+
+1. **Model first.** In `/model`, pick a bigger model for hard or unclear problems and a smaller, cheaper one (such as Haiku) for routine work. The model's price multiplies everything else.
+2. **Then try a strong model at a lower effort** before raising the effort. It often costs less than a weaker model at high effort.
+3. **Raise effort only when you see Claude stopping too early,** for example when it skips checks or misses obvious causes.
+4. **Set both at the start of a session or right after `/clear`.** Changing either mid-conversation invalidates the cache (see [What breaks the cache](#what-breaks-the-cache)). `/effort` also stays as your default for future sessions, so check it when you start.
+
+For very simple sessions you can turn thinking off entirely: `MAX_THINKING_TOKENS=0 claude`. That is below `/effort low`. It works on all models except Fable 5. Skills can set their own `model` and `effort`, and subagents their own `model`, so routine jobs can run cheaply even if your main session is on `high`.
 
 ### Prompt caching
 
@@ -876,9 +999,9 @@ Mention each file only once per conversation. Mentioning it again attaches anoth
 
 #### 2. How many turns it stays
 
-Each new turn rereads all earlier turns, so **several short sessions are cheaper than one long one.** That is what `/clear` and `/compact` are for ([section 10](#10-clear-compact-and-other-context-commands)).
+Each new turn rereads all earlier turns, so **several short sessions are cheaper than one long one.** That is what `/clear` and `/compact` are for ([section 11](#11-clear-compact-and-other-context-commands)).
 
-`/loop` runs a prompt on a timer. Each run is a full turn that carries the whole conversation, and misses the cache if more than an hour passed. Start loops in a fresh session in a separate terminal.
+`/loop` runs a prompt on a timer ([section 9](#9-letting-claude-keep-working-goal-and-loop)). Each run is a full turn that carries the whole conversation, and misses the cache if more than an hour passed. Start loops in a fresh session in a separate terminal.
 
 #### 3. Parallel sessions
 
@@ -886,7 +1009,7 @@ Every session you run in parallel has its own context and its own cost. Run seve
 
 ---
 
-## 10. `/clear`, `/compact` and other context commands
+## 11. `/clear`, `/compact` and other context commands
 
 ### `/clear`: start fresh
 
@@ -943,7 +1066,7 @@ Goes back to an earlier point in the conversation (and can undo file changes too
 
 ---
 
-## 11. Subagents
+## 12. Subagents
 
 A **subagent** is a helper Claude starts for a sub-task. It has its own context window, system prompt, tools and CLAUDE.md, but **not your conversation**. It works through its own turns, and **only its final answer comes back** to your session. Everything else it read is thrown away.
 
@@ -961,7 +1084,7 @@ By default a subagent uses your main model. For a noisy job you repeat often, cr
 
 ---
 
-## 12. Checklist: an efficient session
+## 13. Checklist: an efficient session
 
 1. **Start right.** Check `/model` and `/effort` at the start. Turn on fast mode now if you want it.
 2. **Check the startup load once.** Run `/context` in a fresh session. Trim CLAUDE.md, MCP servers and plugins you do not use.
@@ -973,10 +1096,11 @@ By default a subagent uses your main model. For a noisy job you repeat often, cr
 8. **Plan big changes.** Use plan mode (`Shift+Tab`) so Claude agrees on the approach before it edits anything.
 9. **Ask connectors for less.** "The 5 newest bugs", not "all bugs". Disable connectors you are not using.
 10. **Write permission rules** for commands you always approve, so you aren't interrupted while Claude works.
+11. **Put limits on unattended work.** Give a `/goal` a turn limit, and run `/loop` in a fresh session with a sensible interval.
 
 ---
 
-## 13. Bonus: cutting cost in your own Claude API apps
+## 14. Bonus: cutting cost in your own Claude API apps
 
 The same ideas apply when **you** build apps on the Claude API (as in the earlier lessons). Anthropic's article on this names three levers.
 
@@ -1024,7 +1148,7 @@ In Anthropic's benchmarks, `cost-optimize` cut cost by roughly 24% to 73% with l
 
 ---
 
-## 14. Cheat sheet
+## 15. Cheat sheet
 
 ### Shell
 
@@ -1055,6 +1179,10 @@ In Anthropic's benchmarks, `cost-optimize` cut cost by roughly 24% to 73% with l
 | `/permissions` | Allow, ask and deny rules |
 | `/tasks` | Background commands |
 | `/sandbox` | Turn on the command sandbox |
+| `/goal <condition>` | Keep working until the condition is met |
+| `/goal`, `/goal clear` | Goal status / stop the goal |
+| `/loop 5m <prompt>` | Repeat a prompt every 5 minutes (no interval: Claude picks) |
+| `/schedule` | Cloud routine that runs without your computer |
 | `/agents` | Manage subagents |
 | `/model`, `/effort` | Set model and effort (do it at the start) |
 | `/context` | What fills the context window |

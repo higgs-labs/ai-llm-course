@@ -152,6 +152,7 @@ The `13. claude-code` folder has a guide to using [Claude Code](https://code.cla
 - Skills and the plugin manager (`/skills`, `/plugin`), with examples you can try
 - Connectors (MCP) such as Jira, GitHub and Notion
 - Running terminal commands: permissions, background tasks, hooks, and calling Claude from scripts with `claude -p`
+- Letting Claude keep working on its own with `/goal` and `/loop`
 - How Claude Code consumes tokens, and when to use `/clear`, `/compact` and `/rewind`
 
 The `examples` folder has a sample skill (`explain-code`), a sample plugin marketplace (`course-tools`), a hook that blocks dangerous commands, and a Python script that calls Claude Code. Claude Code needs a paid Claude plan or a Claude Console account.
