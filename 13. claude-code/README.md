@@ -408,6 +408,76 @@ claude
 
 Then try `/skills` and find `explain-code` in the list.
 
+### Popular open-source skill repos
+
+You don't have to write every skill yourself. Thousands are shared on GitHub. These are the most popular ones, with star counts from **19 October 2026**.
+
+Most of them are distributed as plugins, so you install them with the plugin manager ([section 7](#7-plugins-and-the-plugin-manager)): first add the repo as a marketplace, then install the plugin from it. The install commands below come from each repo's own README or marketplace file.
+
+**From Anthropic**
+
+| Repo | Stars | What's in it | Install |
+|---|---|---|---|
+| [anthropics/skills](https://github.com/anthropics/skills) | 182k | Anthropic's own skills: `frontend-design`, `skill-creator`, `mcp-builder`, `webapp-testing`, `claude-api`, and the Word, PDF, PowerPoint and Excel skills that power Claude's file features. Read these first to see what a good skill looks like. | `/plugin marketplace add anthropics/skills`<br>`/plugin install example-skills@anthropic-agent-skills`<br>`/plugin install document-skills@anthropic-agent-skills` |
+| [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) | 43k | The official marketplace that Claude Code adds for you. It lists over 300 plugins, many of them skill packs, such as `frontend-design`, `skill-creator`, `superpowers` and `huggingface-skills`. | Already added:<br>`/plugin install frontend-design@claude-plugins-official` |
+
+Most skills in `anthropics/skills` are open source (Apache 2.0). The Word, PDF, PowerPoint and Excel skills are *source-available*: you can read and use them, but they are not open source.
+
+**How Claude works**
+
+| Repo | Stars | What it does | Install |
+|---|---|---|---|
+| [obra/superpowers](https://github.com/obra/superpowers) | 302k | The most popular skill set. It gives Claude a development process: brainstorm, write a plan, test-driven development, work through subagents, then request a code review. Skills fire on their own when the situation fits. | `/plugin install superpowers@claude-plugins-official` |
+| [multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) | 221k | Four coding principles in one CLAUDE.md file, based on Andrej Karpathy's notes on how LLMs go wrong when coding: running with wrong assumptions instead of asking, overcomplicating code, and changing code unrelated to the task. | `/plugin marketplace add multica-ai/andrej-karpathy-skills`<br>`/plugin install andrej-karpathy-skills@karpathy-skills` |
+
+**Saving tokens** (see [section 13](#13-how-claude-code-consumes-tokens))
+
+| Repo | Stars | What it does | Install |
+|---|---|---|---|
+| [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) | 114k | Makes Claude answer in short, clipped sentences ("why use many token when few token do trick"). Output tokens are the expensive ones, and the repo claims about 65% fewer. | `/plugin marketplace add JuliusBrussee/caveman`<br>`/plugin install caveman@caveman` |
+| [mksglu/context-mode](https://github.com/mksglu/context-mode) | 31k | Keeps large tool output (logs, test runs, big files) out of the conversation and gives Claude only the part it needs. | `/plugin marketplace add mksglu/context-mode`<br>`/plugin install context-mode@context-mode` |
+
+**Design and front end**
+
+| Repo | Stars | What it does | Install |
+|---|---|---|---|
+| [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | 137k | UI/UX design knowledge for many platforms and frameworks. It can generate a design system tailored to your project before Claude builds the interface. | `/plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill`<br>`/plugin install ui-ux-pro-max@ui-ux-pro-max-skill` |
+| [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | 99k | "Taste" for web pages: art direction, reference images and a browser check, so pages don't all look like generic AI output. | `/plugin marketplace add Leonxlnx/taste-skill`<br>`/plugin install taste-skill@taste-skill` |
+
+**Big collections for one field**
+
+| Repo | Stars | What's in it | Install |
+|---|---|---|---|
+| [K-Dense-AI/scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills) | 53k | 177 skills for science: biology, chemistry, medicine, physics, Earth science, data analysis | `npx skills add K-Dense-AI/scientific-agent-skills` |
+| [alirezarezvani/claude-skills](https://github.com/alirezarezvani/claude-skills) | 28k | 380+ skills for engineering, marketing, product, compliance and business | See the repo's README |
+| [Jeffallan/claude-skills](https://github.com/Jeffallan/claude-skills) | 12k | 67 skills for full-stack developers | `/plugin marketplace add Jeffallan/claude-skills`<br>`/plugin install fullstack-dev-skills@fullstack-dev-skills` |
+| [SawyerHood/dev-browser](https://github.com/SawyerHood/dev-browser) | 7k | One skill that lets Claude drive a web browser to test what it built | `/plugin marketplace add SawyerHood/dev-browser`<br>`/plugin install dev-browser@dev-browser-marketplace` |
+
+**Lists to browse**
+
+| Repo | Stars | What it is |
+|---|---|---|
+| [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) | 77k | The biggest curated list of Claude skills |
+| [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) | 56k | Skills plus hooks, slash commands, plugins and other Claude Code tools |
+| [travisvn/awesome-claude-skills](https://github.com/travisvn/awesome-claude-skills) | 15k | Another curated list, focused on Claude Code |
+
+### Installing skills that aren't plugins: `npx skills`
+
+Some repos are just folders of `SKILL.md` files. You can copy a folder into `~/.claude/skills/` (all projects) or `.claude/skills/` (this project). Or use [`npx skills`](https://github.com/vercel-labs/skills) (36k stars), a small installer that works with Claude Code and many other coding agents. It needs Node.js.
+
+```bash
+npx skills add K-Dense-AI/scientific-agent-skills --list              # see what's inside first
+npx skills add K-Dense-AI/scientific-agent-skills -a claude-code      # install into this project
+npx skills add <owner/repo> --skill <name> -g -a claude-code          # one skill, for all your projects
+```
+
+### Before you install a skill
+
+- **Read it first.** A skill is instructions that Claude follows, and many include scripts that run on your computer with your permissions. Open the `SKILL.md` and any scripts on GitHub before installing. Stars show popularity, not safety.
+- **Prefer well-known authors and active repos.** Check when it was last updated and whether issues get answers.
+- **Install a few, not dozens.** Every installed skill's description is loaded in every session, and skills can contradict each other or trigger when you don't want them to. Use `/skill-doctor` to see what each skill costs and how often it is used, and disable or uninstall plugins you don't use.
+- **Star counts change fast.** The numbers above are a snapshot. Use them to compare, not as exact figures.
+
 ---
 
 ## 7. Plugins and the plugin manager

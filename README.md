@@ -150,7 +150,7 @@ The `13. claude-code` folder has a guide to using [Claude Code](https://code.cla
 - Running Claude Code for free with local models through Ollama
 - `/init` and CLAUDE.md
 - Memory (`/memory` and auto memory)
-- Skills and the plugin manager (`/skills`, `/plugin`), with examples you can try
+- Skills and the plugin manager (`/skills`, `/plugin`), with examples you can try, and the most popular open-source skill repos
 - Connectors (MCP) such as Jira, GitHub and Notion
 - Running terminal commands: permissions, background tasks, hooks, and calling Claude from scripts with `claude -p`
 - Letting Claude keep working on its own with `/goal` and `/loop`
