@@ -5,28 +5,30 @@
 This lesson covers:
 
 1. [Installation](#1-installation)
-2. [Your first session](#2-your-first-session)
-3. [`/init` and CLAUDE.md](#3-init-and-claudemd)
-4. [Memory](#4-memory)
-5. [Skills](#5-skills)
-6. [Plugins and the plugin manager](#6-plugins-and-the-plugin-manager)
-7. [Connectors (MCP): Jira, GitHub and more](#7-connectors-mcp-jira-github-and-more)
-8. [Running terminal commands and scripts](#8-running-terminal-commands-and-scripts)
-9. [Letting Claude keep working: `/goal` and `/loop`](#9-letting-claude-keep-working-goal-and-loop)
-10. [How Claude Code consumes tokens](#10-how-claude-code-consumes-tokens)
-11. [`/clear`, `/compact` and other context commands](#11-clear-compact-and-other-context-commands)
-12. [Subagents](#12-subagents)
-13. [Checklist: an efficient session](#13-checklist-an-efficient-session)
-14. [Bonus: cutting cost in your own Claude API apps](#14-bonus-cutting-cost-in-your-own-claude-api-apps)
-15. [Cheat sheet](#15-cheat-sheet)
+2. [Running Claude Code with Ollama (local models)](#2-running-claude-code-with-ollama-local-models)
+3. [Your first session](#3-your-first-session)
+4. [`/init` and CLAUDE.md](#4-init-and-claudemd)
+5. [Memory](#5-memory)
+6. [Skills](#6-skills)
+7. [Plugins and the plugin manager](#7-plugins-and-the-plugin-manager)
+8. [Connectors (MCP): Jira, GitHub and more](#8-connectors-mcp-jira-github-and-more)
+9. [Running terminal commands and scripts](#9-running-terminal-commands-and-scripts)
+10. [Letting Claude keep working: `/goal` and `/loop`](#10-letting-claude-keep-working-goal-and-loop)
+11. [Reviewing pull requests](#11-reviewing-pull-requests)
+12. [How Claude Code consumes tokens](#12-how-claude-code-consumes-tokens)
+13. [`/clear`, `/compact` and other context commands](#13-clear-compact-and-other-context-commands)
+14. [Subagents](#14-subagents)
+15. [Checklist: an efficient session](#15-checklist-an-efficient-session)
+16. [Bonus: cutting cost in your own Claude API apps](#16-bonus-cutting-cost-in-your-own-claude-api-apps)
+17. [Cheat sheet](#17-cheat-sheet)
 
-The `examples` folder has things you can try: a skill ([section 5](#5-skills)), a plugin ([section 6](#6-plugins-and-the-plugin-manager)), and a safety hook plus a Python script that calls Claude ([section 8](#8-running-terminal-commands-and-scripts)).
+The `examples` folder has things you can try: a skill ([section 6](#6-skills)), a plugin ([section 7](#7-plugins-and-the-plugin-manager)), and a safety hook plus a Python script that calls Claude ([section 9](#9-running-terminal-commands-and-scripts)).
 
 ---
 
 ## 1. Installation
 
-You need a paid Claude account (Pro, Max, Team or Enterprise) or a [Claude Console](https://console.anthropic.com/) account with API credits. The free plan does not include Claude Code.
+You need a paid Claude account (Pro, Max, Team or Enterprise) or a [Claude Console](https://console.anthropic.com/) account with API credits. The free plan does not include Claude Code. To try it for free with a local model instead, see [section 2](#2-running-claude-code-with-ollama-local-models).
 
 **System requirements:** macOS 13+, Windows 10 (1809+) or Windows Server 2019+, Ubuntu 20.04+, Debian 10+ or Alpine 3.19+, and at least 4 GB of RAM.
 
@@ -74,7 +76,134 @@ claude update      # updates now
 
 ---
 
-## 2. Your first session
+## 2. Running Claude Code with Ollama (local models)
+
+In lessons 6 and 12 you ran models on your own computer with [Ollama](https://ollama.com/). Claude Code can use those models too. Ollama understands the same API that Claude Code uses to talk to Anthropic (the Messages API), so you only have to point Claude Code at Ollama instead of Anthropic's servers.
+
+**Why you might do this:**
+
+- **Free:** no API bill and no subscription limits.
+- **Private:** your code never leaves your computer.
+- **Offline:** it works without internet once the model is downloaded.
+
+**What you give up:**
+
+- **Quality.** Local open models are much weaker than Claude at agentic coding. They make more mistakes with tool calls and lose track of longer tasks.
+- **Speed.** On a laptop, a simple "read this file and explain it" took about 2 minutes in our test.
+- **Some features.** Ollama has no prompt caching and no hosted web search, and it accepts images only in base64 form.
+- **Support.** Anthropic does not support running Claude Code on non-Claude models. If something breaks, it is between you, Ollama and the model.
+
+So it is a good way to learn Claude Code and to work on small, well-defined tasks for free. For real projects, Claude models give much better results.
+
+### Step 1: install Ollama and pull a model
+
+Install Ollama as in lesson 6, then download a model that supports **tool calling** (Claude Code depends on it):
+
+```bash
+ollama pull gemma4      # the model from lesson 12
+ollama pull qwen3.5     # the local model Ollama's own Claude Code guide uses
+```
+
+### Step 2: give the model a large context window (important!)
+
+Claude Code's system prompt and tool definitions alone are thousands of tokens. Depending on your graphics memory, Ollama's default context window can be as small as **4,096 tokens**. Then the beginning of the prompt is cut off, and the model never even sees your question.
+
+We tested this. With `gemma4` at 4,096 tokens, Claude Code was asked to explain a file. The model ignored the request and replied with a generic "How can I help you today?". With a 64k window, the same request worked: it read the file and explained it correctly.
+
+**Ollama recommends at least 64k (65,536 tokens).** Set it in one of these ways:
+
+- **Ollama app:** open Settings and move the **Context length** slider to 64k or more.
+- **Command line:** quit the Ollama app, then start the server yourself:
+
+  ```bash
+  OLLAMA_CONTEXT_LENGTH=65536 ollama serve                     # macOS/Linux
+  ```
+
+  ```powershell
+  $env:OLLAMA_CONTEXT_LENGTH=65536; ollama serve               # Windows PowerShell
+  ```
+
+Check it with `ollama ps` while a model is loaded. The `CONTEXT` column should say `65536`. A bigger context window uses more memory. If your computer struggles, try a smaller model.
+
+### Step 3, the easy way: `ollama launch claude`
+
+Ollama can start Claude Code for you with everything set up:
+
+```bash
+ollama launch claude                    # a menu lets you pick the model
+ollama launch claude --model gemma4     # start with this model
+```
+
+Anything after `--` is passed on to Claude Code, for example a one-off question:
+
+```bash
+ollama launch claude --model gemma4 --yes -- -p "how does this repository work?"
+```
+
+### Step 3, the manual way: environment variables
+
+You can also set three environment variables and start `claude` yourself.
+
+**macOS/Linux:**
+
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:11434   # send requests to Ollama
+export ANTHROPIC_AUTH_TOKEN=ollama                 # any value works; Ollama ignores it
+export ANTHROPIC_API_KEY=""                        # make sure no real API key is used
+export ANTHROPIC_DEFAULT_HAIKU_MODEL=gemma4        # background jobs (like session titles) use it too
+claude --model gemma4
+```
+
+**Windows PowerShell:**
+
+```powershell
+$env:ANTHROPIC_BASE_URL = "http://localhost:11434"
+$env:ANTHROPIC_AUTH_TOKEN = "ollama"
+$env:ANTHROPIC_API_KEY = ""
+$env:ANTHROPIC_DEFAULT_HAIKU_MODEL = "gemma4"
+claude --model gemma4
+```
+
+These variables only last for that terminal. Open a new terminal to go back to Claude models.
+
+To make it a one-word command on macOS/Linux, add an alias to your `~/.zshrc` or `~/.bashrc`:
+
+```bash
+alias claude-local='ANTHROPIC_BASE_URL=http://localhost:11434 ANTHROPIC_AUTH_TOKEN=ollama ANTHROPIC_API_KEY="" ANTHROPIC_DEFAULT_HAIKU_MODEL=gemma4 claude --model gemma4'
+```
+
+Now `claude` uses Claude, and `claude-local` uses your local model.
+
+### Check that it works
+
+- In the session, run `/status`. **Anthropic base URL** should show `http://localhost:11434`.
+- In another terminal, `ollama ps` should show your model loaded.
+
+Some things look different in a local session:
+
+- Your claude.ai connectors (section 8) are switched off, because the local token takes the place of your claude.ai login.
+- `/usage` and `total_cost_usd` still show a dollar figure. It is estimated from Claude prices and means nothing here. Local runs are free.
+
+### Ollama cloud models
+
+Models whose name ends in `:cloud` (for example `gemma4:cloud`) run on Ollama's servers instead of your computer. They are faster and can be much bigger, but your code leaves your machine, and you need an Ollama account (`ollama signin`). You start them the same way:
+
+```bash
+ollama launch claude --model gemma4:cloud
+```
+
+### Tips for local models
+
+Everything in this lesson works with a local model, but the weaker model makes good habits matter more:
+
+- **Give small, specific tasks** and `@`-mention the files. Don't ask "refactor the project".
+- **Keep sessions short** and use `/clear` often. A long context makes a local model slower *and* more confused.
+- **Use plan mode** (`Shift+Tab`) for anything bigger than a one-file change, and check the plan before it edits.
+- **Turn off what you don't need.** MCP servers, plugins and a long CLAUDE.md all make the prompt longer, and the model has to read all of it on every turn without prompt caching.
+
+---
+
+## 3. Your first session
 
 Go into a project folder and start Claude:
 
@@ -118,7 +247,7 @@ cat error.log | claude -p "what caused this error?"
 
 ---
 
-## 3. `/init` and CLAUDE.md
+## 4. `/init` and CLAUDE.md
 
 Every session starts with no memory of your project. **CLAUDE.md** is a Markdown file Claude reads at the start of every session. Put in it what a new teammate would need: how to install, how to run tests, code style, things to avoid.
 
@@ -160,15 +289,15 @@ You can pull other files in with `@`:
 See @README.md for setup and @docs/style.md for code style.
 ```
 
-**Keep CLAUDE.md short (under about 200 lines).** It is sent with *every* request, so every line costs tokens on every turn (see [section 10](#10-how-claude-code-consumes-tokens)). Put long, task-specific instructions into a [skill](#5-skills) instead. Skills load only when needed.
+**Keep CLAUDE.md short (under about 200 lines).** It is sent with *every* request, so every line costs tokens on every turn (see [section 12](#12-how-claude-code-consumes-tokens)). Put long, task-specific instructions into a [skill](#6-skills) instead. Skills load only when needed.
 
 ---
 
-## 4. Memory
+## 5. Memory
 
 Claude Code has two kinds of memory:
 
-1. **CLAUDE.md files** (section 3). You write them.
+1. **CLAUDE.md files** (section 4). You write them.
 2. **Auto memory.** Claude writes it. When it learns something worth keeping (your preferences, a correction you gave, a project decision), it saves a short note. It is on by default.
 
 Auto memory is stored per project in:
@@ -204,7 +333,7 @@ You can also just ask:
 
 ---
 
-## 5. Skills
+## 6. Skills
 
 A **skill** is a packaged set of instructions for one kind of task, such as "review a PR", "write a release note" or "explain a file to a beginner". It is a folder with a `SKILL.md` file.
 
@@ -280,7 +409,7 @@ Then try `/skills` and find `explain-code` in the list.
 
 ---
 
-## 6. Plugins and the plugin manager
+## 7. Plugins and the plugin manager
 
 A **plugin** bundles skills, subagents, hooks and MCP servers into one installable package. Plugins come from **marketplaces**, which are git repos (or local folders) that list plugins.
 
@@ -343,7 +472,7 @@ claude plugin uninstall commit-commands@claude-plugins-official
 
 Plugin skills are namespaced by the plugin name: `/plugin-name:skill-name`.
 
-**Install only what you use.** Every enabled plugin adds its skill descriptions, tools and MCP servers to the startup context, and that costs tokens on every request (see [section 10](#10-how-claude-code-consumes-tokens)).
+**Install only what you use.** Every enabled plugin adds its skill descriptions, tools and MCP servers to the startup context, and that costs tokens on every request (see [section 12](#12-how-claude-code-consumes-tokens)).
 
 ### How a plugin is built
 
@@ -416,7 +545,7 @@ Open `/plugin` and look at the **Installed** and **Marketplaces** tabs. Uninstal
 
 ---
 
-## 7. Connectors (MCP): Jira, GitHub and more
+## 8. Connectors (MCP): Jira, GitHub and more
 
 Out of the box, Claude Code sees your files and your terminal. **Connectors** let it reach other tools: read a Jira ticket, open a GitHub pull request, check an error in Sentry, search your Notion docs.
 
@@ -559,7 +688,7 @@ In a session, `/mcp` lets you log in or out, reconnect, and **disable** a server
 
 ---
 
-## 8. Running terminal commands and scripts
+## 9. Running terminal commands and scripts
 
 This goes both ways. Claude can run commands in your terminal (tests, Python scripts, git), and you can run Claude from your own scripts.
 
@@ -757,7 +886,7 @@ It installs the Claude GitHub App, stores your key as a repo secret, and opens a
 
 ---
 
-## 9. Letting Claude keep working: `/goal` and `/loop`
+## 10. Letting Claude keep working: `/goal` and `/loop`
 
 Normally Claude finishes a turn and waits for you. Two commands let it keep going without you typing:
 
@@ -808,7 +937,7 @@ It also works in scripts:
 claude -p "/goal CHANGELOG.md has an entry for every PR merged this week"
 ```
 
-**Cost.** Each check runs on a small, fast model and costs very little. The real cost is the extra turns: every turn resends the whole conversation (see [section 10](#10-how-claude-code-consumes-tokens)). A turn limit in the condition is your budget.
+**Cost.** Each check runs on a small, fast model and costs very little. The real cost is the extra turns: every turn resends the whole conversation (see [section 12](#12-how-claude-code-consumes-tokens)). A turn limit in the condition is your budget.
 
 ### `/loop`: repeat on a schedule
 
@@ -849,7 +978,123 @@ claude -p "/goal CHANGELOG.md has an entry for every PR merged this week"
 
 ---
 
-## 10. How Claude Code consumes tokens
+## 11. Reviewing pull requests
+
+Claude Code can review code in three places:
+
+| Where | How | Who can use it |
+|---|---|---|
+| Your terminal | `/code-review`, `/security-review`, `/simplify` | Everyone |
+| GitHub, automatically | Claude Code Review posts comments on every PR | Team and Enterprise plans |
+| GitHub Actions | `@claude review this PR`, or a workflow that reviews every PR | Everyone with an API key or subscription token |
+
+### `/code-review` in your terminal
+
+```
+> /code-review                  # your branch + uncommitted changes, compared with main
+> /code-review 12               # pull request #12
+> /code-review main...my-branch # compare two branches
+> /code-review src/auth         # one folder
+> /code-review high 12          # choose the effort level
+```
+
+It looks for **correctness bugs**. Depending on the model and effort, it also suggests reuse, simplification and efficiency cleanups.
+
+The review runs as a **subagent in the background**, with its own context window. The files it reads don't fill your conversation. You can keep working, and the findings appear when it is done. It follows your CLAUDE.md.
+
+Options:
+
+| Option | What it does |
+|---|---|
+| `low` ... `max` | Effort. `low` reports only findings it is most sure about (fewer false alarms). Higher levels find more but cost more. Claude Code remembers the last level you typed. |
+| `--fix` | Applies the fixes to your files after the review |
+| `--comment` | Posts the findings as inline comments on the GitHub PR (Claude needs access to GitHub, e.g. `gh auth login`) |
+| `--max-findings 5` | Report at most 5 findings (`all` for every finding, `default` to reset) |
+| `ultra` | A deeper review that runs in Anthropic's cloud. Needs a claude.ai login |
+
+A typical flow before you open a PR:
+
+```
+> /code-review --fix
+> !git diff
+```
+
+Check the fixes with `git diff`. `--fix` edits run in the background, so `/rewind` may not undo them. Use git if you want to revert.
+
+### `/security-review` and `/simplify`
+
+- **`/security-review`** checks the changes on your branch (compared with `origin`'s default branch) for security problems such as injection, broken authentication and leaked data.
+- **`/simplify`** does **not** look for bugs. It cleans up your changed code (reuse existing helpers, simplify, remove waste) and applies the changes. Use `/code-review` for bugs.
+
+### Automatic reviews on GitHub: Claude Code Review
+
+On **Team and Enterprise** plans, an organization owner can turn on Claude Code Review for chosen repos. On each PR, several agents look for problems in parallel. A verification step removes false alarms, and the rest are ranked by severity. Claude then posts inline comments, a summary, and a check named "Claude Code Review". **It never approves or blocks a PR.** A human still decides.
+
+- **When it runs** is set per repo: once when the PR is opened, after every push, or only when someone comments `@claude review`.
+- **Review levels:** Quick, Standard (the default) or Deep.
+- **Cost:** billed by token use to the organization. Admins can set a monthly spend limit.
+
+You can give it review-only rules in a **`REVIEW.md`** file in the repo root:
+
+```markdown
+# Review rules
+
+- Only mark a finding "Important" if it would break behavior.
+- Report at most five nits per review.
+- Do not report anything in generated files under src/gen/.
+- Every example script must load API keys from .env, never hard-code them.
+```
+
+`REVIEW.md` is read from the default branch, not from the PR, so a PR can't change its own review rules. CLAUDE.md applies too. The local `/code-review` reads CLAUDE.md only, not `REVIEW.md`.
+
+### Reviews in GitHub Actions
+
+After `/install-github-app` ([section 9](#in-github-actions)), anyone with write access can comment on a PR:
+
+```
+@claude review this PR. Focus on error handling.
+```
+
+To review **every** PR automatically, add a workflow such as `.github/workflows/claude-review.yml`. This example comes from the Claude Code docs:
+
+```yaml
+name: Code Review
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+          prompt: "/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'
+```
+
+It installs the `code-review` plugin and runs it on each PR. Keep the `claude_args` line: it lets Claude post inline comments. PRs from forks of a public repo don't get your secrets, so they are not reviewed.
+
+### Tips
+
+- **A Claude review is a second pair of eyes, not an approval.** Read the findings and decide.
+- **Pick the effort by risk:** `low` for a quick check with few false alarms, `high` or `max` before merging something important.
+- **Put your team's standards in CLAUDE.md** (and `REVIEW.md` for GitHub reviews), so every review checks the same things.
+- **Reviews cost tokens** like any other work. Every push on a busy repo means another review, so choose "once after PR creation" or manual reviews if cost matters.
+
+---
+
+## 12. How Claude Code consumes tokens
 
 This is the most important section for using Claude Code efficiently.
 
@@ -999,9 +1244,9 @@ Mention each file only once per conversation. Mentioning it again attaches anoth
 
 #### 2. How many turns it stays
 
-Each new turn rereads all earlier turns, so **several short sessions are cheaper than one long one.** That is what `/clear` and `/compact` are for ([section 11](#11-clear-compact-and-other-context-commands)).
+Each new turn rereads all earlier turns, so **several short sessions are cheaper than one long one.** That is what `/clear` and `/compact` are for ([section 13](#13-clear-compact-and-other-context-commands)).
 
-`/loop` runs a prompt on a timer ([section 9](#9-letting-claude-keep-working-goal-and-loop)). Each run is a full turn that carries the whole conversation, and misses the cache if more than an hour passed. Start loops in a fresh session in a separate terminal.
+`/loop` runs a prompt on a timer ([section 10](#10-letting-claude-keep-working-goal-and-loop)). Each run is a full turn that carries the whole conversation, and misses the cache if more than an hour passed. Start loops in a fresh session in a separate terminal.
 
 #### 3. Parallel sessions
 
@@ -1009,7 +1254,7 @@ Every session you run in parallel has its own context and its own cost. Run seve
 
 ---
 
-## 11. `/clear`, `/compact` and other context commands
+## 13. `/clear`, `/compact` and other context commands
 
 ### `/clear`: start fresh
 
@@ -1066,7 +1311,7 @@ Goes back to an earlier point in the conversation (and can undo file changes too
 
 ---
 
-## 12. Subagents
+## 14. Subagents
 
 A **subagent** is a helper Claude starts for a sub-task. It has its own context window, system prompt, tools and CLAUDE.md, but **not your conversation**. It works through its own turns, and **only its final answer comes back** to your session. Everything else it read is thrown away.
 
@@ -1084,7 +1329,7 @@ By default a subagent uses your main model. For a noisy job you repeat often, cr
 
 ---
 
-## 13. Checklist: an efficient session
+## 15. Checklist: an efficient session
 
 1. **Start right.** Check `/model` and `/effort` at the start. Turn on fast mode now if you want it.
 2. **Check the startup load once.** Run `/context` in a fresh session. Trim CLAUDE.md, MCP servers and plugins you do not use.
@@ -1100,7 +1345,7 @@ By default a subagent uses your main model. For a noisy job you repeat often, cr
 
 ---
 
-## 14. Bonus: cutting cost in your own Claude API apps
+## 16. Bonus: cutting cost in your own Claude API apps
 
 The same ideas apply when **you** build apps on the Claude API (as in the earlier lessons). Anthropic's article on this names three levers.
 
@@ -1148,7 +1393,7 @@ In Anthropic's benchmarks, `cost-optimize` cut cost by roughly 24% to 73% with l
 
 ---
 
-## 15. Cheat sheet
+## 17. Cheat sheet
 
 ### Shell
 
@@ -1183,6 +1428,9 @@ In Anthropic's benchmarks, `cost-optimize` cut cost by roughly 24% to 73% with l
 | `/goal`, `/goal clear` | Goal status / stop the goal |
 | `/loop 5m <prompt>` | Repeat a prompt every 5 minutes (no interval: Claude picks) |
 | `/schedule` | Cloud routine that runs without your computer |
+| `/code-review [effort] [--fix] [--comment] [pr#]` | Review your changes or a PR for bugs |
+| `/security-review` | Security review of your branch |
+| `/simplify` | Clean up changed code (not a bug hunt) |
 | `/agents` | Manage subagents |
 | `/model`, `/effort` | Set model and effort (do it at the start) |
 | `/context` | What fills the context window |
